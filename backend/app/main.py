@@ -46,8 +46,10 @@ def get_orders_open(db: Session = Depends(get_db)):
 
 
 @app.get("/trades/recent", response_model=schemas.TradesResponse)
-def get_trades_recent(db: Session = Depends(get_db)):
-    trades = crud.get_recent_trades(db, limit=100)
+def get_trades_recent(limit: int = 100, db: Session = Depends(get_db)):
+    # Clamp limit to a reasonable range
+    limit = max(1, min(100, limit))
+    trades = crud.get_recent_trades(db, limit=limit)
     return {"trades": trades}
 
 

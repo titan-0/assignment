@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class OrderBase(BaseModel):
@@ -58,9 +58,9 @@ class TickersResponse(BaseModel):
 # ---- Extra API Schemas ----
 class OrderCreate(BaseModel):
     ticker: str
-    action: str
-    quantity: int
-    price: float
+    action: Literal["BUY", "SELL"]
+    quantity: int = Field(gt=0)
+    price: float = Field(gt=0)
 
 
 class OrderUpdate(BaseModel):
