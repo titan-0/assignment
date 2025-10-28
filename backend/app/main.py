@@ -8,6 +8,9 @@ from typing import Dict, List
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 from sqlalchemy.orm import Session
 
 from .database import DB_PATH, engine, get_db, session_scope
@@ -62,6 +65,10 @@ def get_tickers(db: Session = Depends(get_db)):
 # ---- Extra REST endpoints ----
 @app.post("/orders", response_model=schemas.OrderBase)
 def create_order(order: schemas.OrderCreate, background: BackgroundTasks, db: Session = Depends(get_db)):
+    # Validate ticker exists
+    exists = db.query(Ticker).filter(Ticker.symbol == order.ticker).first()
+    if not exists:
+        raise HTTPException(status_code=422, detail="Unknown ticker symbol")
     created = crud.create_order(db, ticker=order.ticker, action=order.action, quantity=order.quantity, price=order.price)
     # Broadcast new/updated order
     background.add_task(
@@ -250,3 +257,27 @@ async def websocket_live(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
         raise
+
+
+# -------- Serve built frontend (single-image deployment) --------
+STATIC_DIR = os.getenv("FRONTEND_DIST")
+if STATIC_DIR and os.path.isdir(STATIC_DIR):
+    # Mount static assets folder typically at "/assets" from Vite build
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    index_html = os.path.join(STATIC_DIR, "index.html")
+
+    if os.path.isfile(index_html):
+        @app.get("/", include_in_schema=False)
+        async def serve_index_root():
+            return FileResponse(index_html)
+
+        # SPA fallback: serve index.html for non-API routes
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_spa_fallback(full_path: str):
+            # Avoid intercepting API and websocket endpoints
+            if full_path.startswith(("orders", "trades", "tickers", "prices", "ws")):
+                raise HTTPException(status_code=404)
+            return FileResponse(index_html)

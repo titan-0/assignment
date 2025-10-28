@@ -52,7 +52,7 @@ npm install
 npm run dev
 ```
 
-Vite dev server: http://localhost:5174
+Vite dev server: http://localhost:5173
 
 Environment variables (already provided in `frontend/.env`):
 

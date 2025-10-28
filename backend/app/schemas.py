@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Optional, Literal
 
 from pydantic import BaseModel, Field
+from pydantic import field_validator
 
 
 class OrderBase(BaseModel):
@@ -57,10 +58,20 @@ class TickersResponse(BaseModel):
 
 # ---- Extra API Schemas ----
 class OrderCreate(BaseModel):
-    ticker: str
+    ticker: str = Field(min_length=1, max_length=32)
     action: Literal["BUY", "SELL"]
-    quantity: int = Field(gt=0)
-    price: float = Field(gt=0)
+    quantity: int = Field(gt=0, le=1_000_000)
+    price: float = Field(gt=0, le=1_000_000_000)
+
+    @field_validator("ticker")
+    @classmethod
+    def normalize_ticker(cls, v: str) -> str:
+        v = (v or "").strip().upper()
+        # Allow A-Z, 0-9, underscore
+        for ch in v:
+            if not ("A" <= ch <= "Z" or "0" <= ch <= "9" or ch == "_"):
+                raise ValueError("ticker may only contain A-Z, 0-9, and underscore")
+        return v
 
 
 class OrderUpdate(BaseModel):
